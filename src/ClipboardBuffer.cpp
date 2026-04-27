@@ -1,26 +1,9 @@
 #include <ClipboardBuffer.h>
+#include <cstdlib>
 #include <unistd.h>
+#include <chrono>
 
 #ifdef __APPLE__
-void MacOSInterfaceClipboard::getTextUser()
-{
-    m_buffer.clear();
-
-    char buffer[128];
-
-    // !!! for getting text from clipboard on mac we`ll use utility "pbpaste" !!!
-    std::unique_ptr<FILE, decltype(&pclose)> pipe(popen("pbpaste", "r"), pclose);
-    if( !pipe ) {
-        throw std::runtime_error("error pbpaste");
-    }
-
-    while( fgets(buffer, sizeof(buffer), pipe.get()) != nullptr ) {
-        this->m_buffer += buffer;
-    }
-
-    std::cout << "TEXT: " << m_buffer << std::endl;
-}
-
 void MacOSInterfaceClipboard::callKeyCombination(CGKeyCode keyCode, CGEventFlags modifier)
 {
     CGEventRef keyDown = CGEventCreateKeyboardEvent(NULL, keyCode, true);
@@ -33,8 +16,6 @@ void MacOSInterfaceClipboard::callKeyCombination(CGKeyCode keyCode, CGEventFlags
 
     CFRelease(keyDown);
     CFRelease(keyUp);
-
-    this->getTextUser();
 }
 
 CGEventRef MacOSInterfaceClipboard::handlerSystemScanning(CGEventTapProxy proxy, CGEventType type, CGEventRef event, void *refcon)
@@ -92,3 +73,54 @@ void MacOSInterfaceClipboard::startScanUser()
     CFRelease(eventTap);
 }
 #endif
+
+UseClipboard::UseClipboard()
+{
+#ifdef __APPLE__
+    m_interfacePtr = std::make_unique<MacOSInterfaceClipboard>();
+#endif
+}
+
+UseClipboard::~UseClipboard()
+{
+    m_running = false;
+    if( m_thread.joinable() )
+        m_thread.join();
+}
+
+void UseClipboard::start()
+{
+    m_thread = std::thread(&UseClipboard::checkBufThread, this);
+    m_thread.detach();
+    m_interfacePtr->startScanUser();
+}
+
+void UseClipboard::checkBufThread()
+{
+    std::cout << "checkBuf()\n";
+    while( m_running )
+    {
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        // std::cout << "checking!\n";
+
+        std::string strBuffer = "";
+        static std::string prevBuffer = "";
+        char buffer[128];
+
+        // !!! for getting text from clipboard on mac we`ll use utility "pbpaste" !!!
+        std::unique_ptr<FILE, decltype(&pclose)> pipe(popen("pbpaste", "r"), pclose);
+        if( !pipe ) {
+            throw std::runtime_error("error pbpaste");
+        }
+
+        while( fgets(buffer, sizeof(buffer), pipe.get()) != nullptr ) {
+            strBuffer += buffer;
+        }
+
+        if( prevBuffer != strBuffer ) {
+            // std::cout << "found! = " << strBuffer << std::endl;
+            prevBuffer = strBuffer;
+            this->useBuffer(strBuffer);
+        }
+    }
+}

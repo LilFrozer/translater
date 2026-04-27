@@ -1,19 +1,17 @@
-#include "ClipboardBuffer.h"
 #include <Translater.h>
-#include <unistd.h>
-#include <memory>
 
 Translater::Translater() : UseClipboard{}
 {
     std::cout << "Translater()\n";
-
+    this->start();
 }
 
 Translater::~Translater()
 {
+    std::cout << "~Translater()\n";
 }
 
-void Translater::useText()
+void Translater::useBuffer(const std::string &text)
 {
-    std::cout << "TEXT: " << m_interfacePtr->get_buffer() << std::endl;
+    std::cout << "text-> " << text << std::endl;
 }

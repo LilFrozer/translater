@@ -9,7 +9,7 @@ class Translater : public UseClipboard
 public:
     Translater();
     ~Translater();
-    void useText();
+    void useBuffer(const std::string &text) override final;
 };
 
 #endif
